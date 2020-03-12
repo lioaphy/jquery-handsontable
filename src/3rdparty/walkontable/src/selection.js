@@ -1,144 +1,289 @@
-function WalkontableSelection(settings, cellRange) {
-  this.settings = settings;
-  this.cellRange = cellRange || null;
-  this.instanceBorders = {};
+import { addClass, hasClass } from './../../../helpers/dom/element';
+import Border from './border';
+import CellCoords from './cell/coords';
+import CellRange from './cell/range';
+
+/**
+ * @class Selection
+ */
+class Selection {
+  /**
+   * @param {Object} settings
+   * @param {CellRange} cellRange
+   */
+  constructor(settings, cellRange) {
+    this.settings = settings;
+    this.cellRange = cellRange || null;
+    this.instanceBorders = {};
+    this.classNames = [this.settings.className];
+    this.classNameGenerator = this.linearClassNameGenerator(this.settings.className, this.settings.layerLevel);
+  }
+
+  /**
+   * Each Walkontable clone requires it's own border for every selection. This method creates and returns selection
+   * borders per instance
+   *
+   * @param {Walkontable} wotInstance
+   * @returns {Border}
+   */
+  getBorder(wotInstance) {
+    if (!this.instanceBorders[wotInstance.guid]) {
+      this.instanceBorders[wotInstance.guid] = new Border(wotInstance, this.settings);
+    }
+
+    return this.instanceBorders[wotInstance.guid];
+  }
+
+  /**
+   * Checks if selection is empty
+   *
+   * @returns {Boolean}
+   */
+  isEmpty() {
+    return this.cellRange === null;
+  }
+
+  /**
+   * Adds a cell coords to the selection
+   *
+   * @param {CellCoords} coords
+   */
+  add(coords) {
+    if (this.isEmpty()) {
+      this.cellRange = new CellRange(coords);
+
+    } else {
+      this.cellRange.expand(coords);
+    }
+
+    return this;
+  }
+
+  /**
+   * If selection range from or to property equals oldCoords, replace it with newCoords. Return boolean
+   * information about success
+   *
+   * @param {CellCoords} oldCoords
+   * @param {CellCoords} newCoords
+   * @returns {Boolean}
+   */
+  replace(oldCoords, newCoords) {
+    if (!this.isEmpty()) {
+      if (this.cellRange.from.isEqual(oldCoords)) {
+        this.cellRange.from = newCoords;
+
+        return true;
+      }
+      if (this.cellRange.to.isEqual(oldCoords)) {
+        this.cellRange.to = newCoords;
+
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Clears selection
+   *
+   * @returns {Selection}
+   */
+  clear() {
+    this.cellRange = null;
+
+    return this;
+  }
+
+  /**
+   * Returns the top left (TL) and bottom right (BR) selection coordinates
+   *
+   * @returns {Array} Returns array of coordinates for example `[1, 1, 5, 5]`
+   */
+  getCorners() {
+    const topLeft = this.cellRange.getTopLeftCorner();
+    const bottomRight = this.cellRange.getBottomRightCorner();
+
+    return [
+      topLeft.row,
+      topLeft.col,
+      bottomRight.row,
+      bottomRight.col,
+    ];
+  }
+
+  /**
+   * Adds class name to cell element at given coords
+   *
+   * @param {Walkontable} wotInstance Walkontable instance
+   * @param {Number} sourceRow Cell row coord
+   * @param {Number} sourceColumn Cell column coord
+   * @param {String} className Class name
+   * @param {Boolean} [markIntersections=false] If `true`, linear className generator will be used to add CSS classes
+   *                                            in a continuous way.
+   * @returns {Selection}
+   */
+  addClassAtCoords(wotInstance, sourceRow, sourceColumn, className, markIntersections = false) {
+    const TD = wotInstance.wtTable.getCell(new CellCoords(sourceRow, sourceColumn));
+
+    if (typeof TD === 'object') {
+      let cellClassName = className;
+
+      if (markIntersections) {
+        cellClassName = this.classNameGenerator(TD);
+
+        if (!this.classNames.includes(cellClassName)) {
+          this.classNames.push(cellClassName);
+        }
+      }
+
+      addClass(TD, cellClassName);
+    }
+
+    return this;
+  }
+
+  /**
+   * Generate helper for calculating classNames based on previously added base className.
+   * The generated className is always generated as a continuation of the previous className. For example, when
+   * the currently checked element has 'area-2' className the generated new className will be 'area-3'. When
+   * the element doesn't have any classNames than the base className will be returned ('area');
+   *
+   * @param {String} baseClassName Base className to be used.
+   * @param {Number} layerLevelOwner Layer level which the instance of the Selection belongs to.
+   * @return {Function}
+   */
+  linearClassNameGenerator(baseClassName, layerLevelOwner) {
+    // TODO: Make this recursive function Proper Tail Calls (TCO/PTC) friendly.
+    return function calcClassName(element, previousIndex = -1) {
+      if (layerLevelOwner === 0 || previousIndex === 0) {
+        return baseClassName;
+      }
+
+      let index = previousIndex >= 0 ? previousIndex : layerLevelOwner;
+      let className = baseClassName;
+
+      index -= 1;
+
+      const previousClassName = index === 0 ? baseClassName : `${baseClassName}-${index}`;
+
+      if (hasClass(element, previousClassName)) {
+        const currentLayer = index + 1;
+
+        className = `${baseClassName}-${currentLayer}`;
+
+      } else {
+        className = calcClassName(element, index);
+      }
+
+      return className;
+    };
+  }
+
+  /**
+   * @param wotInstance
+   */
+  draw(wotInstance) {
+    if (this.isEmpty()) {
+      if (this.settings.border) {
+        this.getBorder(wotInstance).disappear();
+      }
+
+      return;
+    }
+
+    const renderedRows = wotInstance.wtTable.getRenderedRowsCount();
+    const renderedColumns = wotInstance.wtTable.getRenderedColumnsCount();
+    const corners = this.getCorners();
+    const [topRow, topColumn, bottomRow, bottomColumn] = corners;
+
+    for (let column = 0; column < renderedColumns; column += 1) {
+      const sourceCol = wotInstance.wtTable.columnFilter.renderedToSource(column);
+
+      if (sourceCol >= topColumn && sourceCol <= bottomColumn) {
+        const TH = wotInstance.wtTable.getColumnHeader(sourceCol);
+
+        if (TH) {
+          const newClasses = [];
+
+          if (this.settings.highlightHeaderClassName) {
+            newClasses.push(this.settings.highlightHeaderClassName);
+          }
+
+          if (this.settings.highlightColumnClassName) {
+            newClasses.push(this.settings.highlightColumnClassName);
+          }
+
+          addClass(TH, newClasses);
+        }
+      }
+    }
+
+    for (let row = 0; row < renderedRows; row += 1) {
+      const sourceRow = wotInstance.wtTable.rowFilter.renderedToSource(row);
+
+      if (sourceRow >= topRow && sourceRow <= bottomRow) {
+        const TH = wotInstance.wtTable.getRowHeader(sourceRow);
+
+        if (TH) {
+          const newClasses = [];
+
+          if (this.settings.highlightHeaderClassName) {
+            newClasses.push(this.settings.highlightHeaderClassName);
+          }
+
+          if (this.settings.highlightRowClassName) {
+            newClasses.push(this.settings.highlightRowClassName);
+          }
+
+          addClass(TH, newClasses);
+        }
+      }
+
+      for (let column = 0; column < renderedColumns; column += 1) {
+        const sourceCol = wotInstance.wtTable.columnFilter.renderedToSource(column);
+
+        if (sourceRow >= topRow && sourceRow <= bottomRow && sourceCol >= topColumn && sourceCol <= bottomColumn) {
+          // selected cell
+          if (this.settings.className) {
+            this.addClassAtCoords(wotInstance, sourceRow, sourceCol, this.settings.className, this.settings.markIntersections);
+          }
+
+        } else if (sourceRow >= topRow && sourceRow <= bottomRow) {
+          // selection is in this row
+          if (this.settings.highlightRowClassName) {
+            this.addClassAtCoords(wotInstance, sourceRow, sourceCol, this.settings.highlightRowClassName);
+          }
+        } else if (sourceCol >= topColumn && sourceCol <= bottomColumn) {
+          // selection is in this column
+          if (this.settings.highlightColumnClassName) {
+            this.addClassAtCoords(wotInstance, sourceRow, sourceCol, this.settings.highlightColumnClassName);
+          }
+        }
+
+        const additionalSelectionClass = wotInstance.getSetting('onAfterDrawSelection', sourceRow, sourceCol, corners, this.settings.layerLevel);
+
+        if (typeof additionalSelectionClass === 'string') {
+          this.addClassAtCoords(wotInstance, sourceRow, sourceCol, additionalSelectionClass);
+        }
+
+      }
+    }
+
+    wotInstance.getSetting('onBeforeDrawBorders', corners, this.settings.className);
+
+    if (this.settings.border) {
+      // warning! border.appear modifies corners!
+      this.getBorder(wotInstance).appear(corners);
+    }
+  }
+
+  /**
+   * Cleans up all the DOM state related to a Selection instance. Call this prior to deleting a Selection instance.
+   */
+  destroy() {
+    Object.values(this.instanceBorders).forEach(border => border.destroy());
+  }
 }
 
-/**
- * Each Walkontable clone requires it's own border for every selection. This method creates and returns selection borders per instance
- * @param {Walkontable} instance
- * @returns {WalkontableBorder}
- */
-WalkontableSelection.prototype.getBorder = function (instance) {
-  if (this.instanceBorders[instance.guid]) {
-    return this.instanceBorders[instance.guid];
-  }
-  this.instanceBorders[instance.guid] = new WalkontableBorder(instance, this.settings); //where is this returned?
-};
-
-/**
- * Returns boolean information if selection is empty
- * @returns {boolean}
- */
-WalkontableSelection.prototype.isEmpty = function () {
-  return (this.cellRange === null);
-};
-
-/**
- * Adds a cell coords to the selection
- * @param {WalkontableCellCoords} coords
- */
-WalkontableSelection.prototype.add = function (coords) {
-  if (this.isEmpty()) {
-    this.cellRange = new WalkontableCellRange(coords, coords, coords);
-  }
-  else {
-    this.cellRange.expand(coords);
-  }
-};
-
-/**
- * If selection range from or to property equals oldCoords, replace it with newCoords. Return boolean information about success
- * @param {WalkontableCellCoords} oldCoords
- * @param {WalkontableCellCoords} newCoords
- * @return {boolean}
- */
-WalkontableSelection.prototype.replace = function (oldCoords, newCoords) {
-  if (!this.isEmpty()) {
-    if(this.cellRange.from.isEqual(oldCoords)) {
-      this.cellRange.from = newCoords;
-      return true;
-    }
-    if(this.cellRange.to.isEqual(oldCoords)) {
-      this.cellRange.to = newCoords;
-      return true;
-    }
-  }
-  return false;
-};
-
-WalkontableSelection.prototype.clear = function () {
-  this.cellRange = null;
-};
-
-/**
- * Returns the top left (TL) and bottom right (BR) selection coordinates
- * @returns {Object}
- */
-WalkontableSelection.prototype.getCorners = function () {
-  var topLeft = this.cellRange.getTopLeftCorner();
-  var bottomRight = this.cellRange.getBottomRightCorner();
-  return [topLeft.row, topLeft.col, bottomRight.row, bottomRight.col];
-};
-
-WalkontableSelection.prototype.addClassAtCoords = function (instance, source_r, source_c, cls) {
-  var TD = instance.wtTable.getCell(new WalkontableCellCoords(source_r, source_c));
-  if(typeof TD === 'object') {
-    Handsontable.Dom.addClass(TD, cls);
-  }
-};
-
-WalkontableSelection.prototype.draw = function (instance) {
-  var corners, r, c, source_r, source_c,
-    visibleRows = instance.wtTable.getRowStrategy().countVisible(),
-    renderedColumns = instance.wtTable.getColumnStrategy().cellCount;
-
-  if (!this.isEmpty()) {
-    corners = this.getCorners();
-
-    for (r = 0; r < visibleRows; r++) {
-      source_r = instance.wtTable.rowFilter.visibleToSource(r);
-
-      for (c = 0; c < renderedColumns; c++) {
-        source_c = instance.wtTable.columnFilter.visibleToSource(c);
-
-        if (source_r >= corners[0] && source_r <= corners[2] && source_c >= corners[1] && source_c <= corners[3]) {
-          //selected cell
-          if (this.settings.className) {
-            this.addClassAtCoords(instance, source_r, source_c, this.settings.className);
-          }
-
-          // selected row headers
-          if(source_c === corners[1]) {
-            var TH = instance.wtTable.getRowHeader(source_r);
-            if (TH) {
-              Handsontable.Dom.addClass(TH, this.settings.highlightRowClassName);
-            }
-          }
-
-          // selected column headers
-          if(source_r === corners[0] || (source_r > corners[0] && r == 0)) {
-            var TH = instance.wtTable.getColumnHeader(source_c);
-            if (TH) {
-              Handsontable.Dom.addClass(TH, this.settings.highlightColumnClassName);
-            }
-          }
-        }
-        else if (source_r >= corners[0] && source_r <= corners[2]) {
-          //selection is in this row
-          this.addClassAtCoords(instance, source_r, source_c, this.settings.highlightRowClassName);
-        }
-        else if (source_c >= corners[1] && source_c <= corners[3]) {
-          //selection is in this column
-          this.addClassAtCoords(instance, source_r, source_c, this.settings.highlightColumnClassName);
-        }
-      }
-    }
-
-    instance.getSetting('onBeforeDrawBorders', corners, this.settings.className);
-    if (this.settings.border) {
-      var border = this.getBorder(instance);
-      if (border) {
-        border.appear(corners); //warning! border.appear modifies corners!
-      }
-    }
-  }
-  else {
-    if (this.settings.border) {
-      var border = this.getBorder(instance);
-      if (border) {
-        border.disappear();
-      }
-    }
-  }
-};
+export default Selection;

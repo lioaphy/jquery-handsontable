@@ -1,40 +1,54 @@
 /**
- * Function responsible for validation of autocomplete value
+ * Autocomplete cell validator.
+ *
+ * @private
+ * @validator AutocompleteValidator
  * @param {*} value - Value of edited cell
- * @param {*} calback - Callback called with validation result
+ * @param {Function} callback - Callback called with validation result
  */
-var process = function (value, callback) {
+export default function autocompleteValidator(value, callback) {
+  let valueToValidate = value;
 
-  var originalVal  = value;
-  var lowercaseVal = typeof originalVal === 'string' ? originalVal.toLowerCase() : null;
+  if (valueToValidate === null || valueToValidate === void 0) {
+    valueToValidate = '';
+  }
 
-  return function (source) {
-    var found = false;
-    for (var s = 0, slen = source.length; s < slen; s++) {
+  if (this.allowEmpty && valueToValidate === '') {
+    callback(true);
+
+    return;
+  }
+
+  if (this.strict && this.source) {
+    if (typeof this.source === 'function') {
+      this.source(valueToValidate, process(valueToValidate, callback));
+    } else {
+      process(valueToValidate, callback)(this.source);
+    }
+  } else {
+    callback(true);
+  }
+}
+
+/**
+ * Function responsible for validation of autocomplete value.
+ *
+ * @param {*} value - Value of edited cell
+ * @param {Function} callback - Callback called with validation result
+ */
+function process(value, callback) {
+  const originalVal = value;
+
+  return function(source) {
+    let found = false;
+
+    for (let s = 0, slen = source.length; s < slen; s++) {
       if (originalVal === source[s]) {
-        found = true; //perfect match
-        break;
-      }
-      else if (lowercaseVal === source[s].toLowerCase()) {
-        // changes[i][3] = source[s]; //good match, fix the case << TODO?
-        found = true;
+        found = true; // perfect match
         break;
       }
     }
 
     callback(found);
-  }
-};
-
-/**
- * Autocomplete cell validator
- * @param {*} value - Value of edited cell
- * @param {*} calback - Callback called with validation result
- */
-Handsontable.AutocompleteValidator = function (value, callback) {
-  if (this.strict && this.source) {
-    typeof this.source === 'function' ? this.source(value, process(value, callback)) : process(value, callback)(this.source);
-  } else {
-    callback(true);
-  }
-};
+  };
+}

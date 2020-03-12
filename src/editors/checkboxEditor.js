@@ -1,28 +1,33 @@
-(function(Handsontable){
+import BaseEditor from './_baseEditor';
+import { hasClass } from './../helpers/dom/element';
 
-  //Blank editor, because all the work is done by renderer
-  var CheckboxEditor = Handsontable.editors.BaseEditor.prototype.extend();
+/**
+ * @private
+ * @editor CheckboxEditor
+ * @class CheckboxEditor
+ */
+class CheckboxEditor extends BaseEditor {
+  beginEditing(initialValue, event) {
+    // Just some events connected with checkbox editor are delegated here. Some `keydown` events like `enter` and `space` key press
+    // are handled inside `checkboxRenderer`. Some events come here from `editorManager`. Below `if` statement was created by author
+    // for purpose of handling only `doubleclick` event which may be done on a cell with checkbox.
 
-  CheckboxEditor.prototype.beginEditing = function () {
-    var checkbox = this.TD.querySelector('input[type="checkbox"]');
+    if (event && event.type === 'mouseup') {
+      const checkbox = this.TD.querySelector('input[type="checkbox"]');
 
-    if (checkbox) {
-      $(checkbox).trigger('click');
+      if (!hasClass(checkbox, 'htBadValue')) {
+        checkbox.click();
+      }
     }
+  }
 
-  };
+  finishEditing() {}
+  init() {}
+  open() {}
+  close() {}
+  getValue() {}
+  setValue() {}
+  focus() {}
+}
 
-  CheckboxEditor.prototype.finishEditing = function () {};
-
-  CheckboxEditor.prototype.init = function () {};
-  CheckboxEditor.prototype.open = function () {};
-  CheckboxEditor.prototype.close = function () {};
-  CheckboxEditor.prototype.getValue = function () {};
-  CheckboxEditor.prototype.setValue = function () {};
-  CheckboxEditor.prototype.focus = function () {};
-
-  Handsontable.editors.CheckboxEditor = CheckboxEditor;
-  Handsontable.editors.registerEditor('checkbox', CheckboxEditor);
-
-})(Handsontable);
-
+export default CheckboxEditor;

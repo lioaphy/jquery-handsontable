@@ -1,83 +1,174 @@
-# Handsontable [![Build Status](https://travis-ci.org/handsontable/jquery-handsontable.png?branch=master)](https://travis-ci.org/handsontable/jquery-handsontable)
+<div align="center">
 
-Handsontable is a minimalist approach to Excel-like table editor (datagrid/data grid) in HTML & jQuery. 
+<a href="//handsontable.com" rel="nofollow"><img src="https://raw.githubusercontent.com/handsontable/handsontable/develop/resources/handsontable-logo.svg?sanitize=true" alt="Handsontable" width="300"></a>
 
-Requires jQuery 1.9+ or 2.0+. Runs in IE 8-11, Firefox, Chrome, Safari and Opera.
+**Handsontable** is a JavaScript/HTML5 data grid component with spreadsheet look & feel. <br>
+It provides easy data binding, data validation, filtering, sorting and CRUD operations.
 
-See the demos at http://handsontable.com/ or fork the example on [JSFiddle](http://jsfiddle.net/warpech/hU6Kz/).
+Handsontable works with [Vue](//github.com/handsontable/vue-handsontable-official), [React](//github.com/handsontable/react-handsontable) and [Angular](//github.com/handsontable/angular-handsontable).
+<br><br>
+[![npm](https://img.shields.io/npm/dt/handsontable.svg)](//npmjs.com/package/handsontable)
+[![npm](https://img.shields.io/npm/dm/handsontable.svg)](//npmjs.com/package/handsontable)
+[![Build status](https://app.codeship.com/projects/1ec34290-ed0a-0131-911c-1a47c8fbcce0/status?branch=master)](https://app.codeship.com/projects/26649)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fhandsontable%2Fhandsontable.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fhandsontable%2Fhandsontable?ref=badge_shield)
+[![Known Vulnerabilities](https://snyk.io/test/github/handsontable/handsontable/badge.svg?targetFile=package.json)](https://snyk.io/test/github/handsontable/handsontable?targetFile=package.json)
+[![](https://data.jsdelivr.com/v1/package/npm/handsontable/badge?style=rounded)](https://www.jsdelivr.com/package/npm/handsontable)
+</div>
+
+<br>
+
+<div align="center">
+<a href="//handsontable.com/examples?headers">
+<img src="https://raw.githubusercontent.com/handsontable/handsontable/develop/resources/handsontable-github-preview.png" align="center" alt="Handsontable Screenshot" width="861"/>
+</a>
+</div>
+
+<br>
+
+## Installation
+
+Use npm to install the latest version.
+```
+npm install handsontable
+```
+
+You can use Yarn, NuGet or [other methods](//handsontable.com/download) as well. You can load it directly from [jsDelivr](//www.jsdelivr.com/package/npm/handsontable).
 
 ## Usage
 
-First, include all the dependencies. All the files that you need (apart from jQuery) are in the `dist\` directory:
+Create a placeholder - an HTML element holding a place for a data grid.
 
 ```html
-<script src="../lib/jquery.min.js"></script>
-<script src="dist/jquery.handsontable.full.js"></script>
-<link rel="stylesheet" media="screen" href="dist/jquery.handsontable.full.css">
+<div id="example"></div>
 ```
 
-Then, run `handsontable()` constructor on an empty div. After that, load some data if you wish:
+Import Handsontable and its stylesheet.
+```js
+import Handsontable from "handsontable";
+import 'handsontable/dist/handsontable.full.css';
+```
 
+Alternatively, you can simply embed it in your HTML file.
 ```html
-<div id="dataTable"></div>
-<script>
-  var data = [
-    ["", "Kia", "Nissan", "Toyota", "Honda"],
-    ["2008", 10, 11, 12, 13],
-    ["2009", 20, 11, 14, 13],
-    ["2010", 30, 15, 12, 13]
-  ];
-  $("#dataTable").handsontable({
-    data: data,
-    startRows: 6,
-    startCols: 8
-  });
-</script>
+<script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css" rel="stylesheet">
 ```
 
-## API Reference
+Now turn your placeholder into a data grid with sample data.
+```js
+const data = [
+  ['', 'Tesla', 'Volvo', 'Toyota', 'Ford'],
+  ['2019', 10, 11, 12, 13],
+  ['2020', 20, 11, 14, 13],
+  ['2021', 30, 15, 12, 13]
+];
 
-Check out the new wiki pages: [Options](https://github.com/handsontable/jquery-handsontable/wiki/Options), [Methods](https://github.com/handsontable/jquery-handsontable/wiki/Methods) and [Events](https://github.com/handsontable/jquery-handsontable/wiki/Events)
+const container = document.getElementById('example');
+const hot = new Handsontable(container, {
+  data: data,
+  rowHeaders: true,
+  colHeaders: true
+});
+```
 
-## Changelog
+##### [See the live demo](//handsontable.com/examples)
 
-To see the list of recent changes, see [Releases](https://github.com/handsontable/jquery-handsontable/releases).
+## Features
 
-## Questions
+A list of some of the most popular features:
 
-Please use the :new: [Handsontable Google Group](https://groups.google.com/forum/?fromgroups=#!forum/handsontable) for posting general **Questions**.
+- Multiple column sorting
+- Non-contiguous selection
+- Filtering data
+- Export to file
+- Validating data
+- Conditional formatting
+- Merging cells
+- Custom cell types
+- Freezing rows/columns
+- Moving rows/columns
+- Resizing rows/columns
+- Hiding rows/columns
+- Context menu
+- Comments
+- Auto-fill option
 
-Make sure the question was not answered before in [FAQ](https://github.com/handsontable/jquery-handsontable/wiki/FAQ) or [GitHub Issues](https://github.com/handsontable/jquery-handsontable/issues)
+## Framework support
 
-## Reporting bugs and feature requests
+Use one of the available wrappers to use Handsontable with your favorite framework:
 
-Please follow this guidelines when reporting bugs and feature requests:
+- [Handsontable for Vue](//github.com/handsontable/vue-handsontable-official)
+- [Handsontable for React](//github.com/handsontable/react-handsontable)
+- [Handsontable for Angular](//github.com/handsontable/angular-handsontable)
 
-1. Use [GitHub Issues](https://github.com/handsontable/jquery-handsontable/issues) board to report bugs and feature requests (not my email address)
-2. Please **always** write steps to reporoduce the error. That way we can focus on fixing the bug, not scratching our heads trying to reproduce it.
-3. If possible, please add a JSFiddle link that shows the problem (start by forking [this fiddle](http://jsfiddle.net/warpech/hU6Kz/)). It saves me much time.
-4. If you can't reproduce it on JSFiddle, please add a screenshot that shows the problem. JSFiddle is much more appreciated because it lets me start fixing straight away.
+## Documentation
 
-Thanks for understanding!
+- [Developer guides](//handsontable.com/docs)
+- [API Reference](//handsontable.com/docs/Core.html)
+- [Release notes](//handsontable.com/docs/tutorial-release-notes.html)
+- [Twitter](//twitter.com/handsontable) (News and updates)
 
-## Contributing
+## Support and contribution
 
-Please see [CONTRIBUTING.md](CONTRIBUTING.md)
+We provide support for all users through [GitHub issues](//github.com/handsontable/handsontable/issues). If you have a commercial license then you can add a new ticket through the [contact form](//handsontable.com/contact?category=technical_support).
 
-## Similar projects
+If you would like to contribute to this project, make sure you first read the [guide for contributors](//github.com/handsontable/handsontable/blob/master/CONTRIBUTING.md).
 
-I want to stay motivated to keep Handsontable the best possible editable datagrid on the Web. Therefore, I invite you to check out alternative projects. I would love to receive feedback if you would like to import some of their features to Handsontable.
+## Browser compatibility
 
- - [DataTables](http://datatables.net/)
- - [SlickGrid](https://github.com/mleibman/SlickGrid)
- - [jqGrid](http://www.trirand.com/blog/)
- - [jTable](http://www.jtable.org/)
- - [jui_datagrid](http://www.pontikis.net/labs/jui_datagrid/)
- - [ParamQuery](http://paramquery.com/)
- - [Ember Table](http://addepar.github.io/ember-table/)
- - [Backgrid.js](http://backgridjs.com/)
- - [dgrid](http://dojofoundation.org/packages/dgrid/)
+Handsontable is compatible with modern browsers such as Chrome, Firefox, Safari, Opera, and Edge. It also supports Internet Explorer 9 to 11 but with limited performance.
 
 ## License
 
-The MIT License (see the [LICENSE](https://github.com/handsontable/jquery-handsontable/blob/master/LICENSE) file for the full text)
+Handsontable is dual-licensed. You can either use a free license for all your non-commercial projects or purchase a commercial license. See the table below for a comparison of these two.
+
+<table>
+  <thead align="center">
+    <tr>
+      <th width="50%">Free license</th>
+      <th width="50%">Paid license</th>
+    </tr>    
+  </thead>
+  <tbody align="center">
+    <tr>
+      <td>For non-commercial purposes such as teaching, academic research, personal experimentation, and evaluating  on development and testing servers.</td>
+      <td>For all commercial purposes</td>
+    </tr>
+    <tr>
+      <td>All features are available</td>
+      <td>All features are available</td>
+    </tr>
+    <tr>
+      <td>Community support</td>
+      <td>Dedicated support</td>
+    </tr>    
+    <tr>
+      <td><a href="//github.com/handsontable/handsontable/blob/master/LICENSE.txt">Read the license</a></td>
+      <td><a href="//handsontable.com/pricing">See plans</a></td>
+    </tr>
+  </tbody>
+</table>
+
+## License key
+
+**The license key is obligatory since [Handsontable 7.0.0](//github.com/handsontable/handsontable/releases/tag/7.0.0) (released in March 2019).**
+
+If you use Handsontable for purposes not intended toward monetary compensation such as, but not limited to, teaching, academic research, evaluation, testing and experimentation, pass the phrase `'non-commercial-and-evaluation'`, as presented below:
+
+```js
+const hot = new Handsontable(container, {
+  data: data,
+  rowHeaders: true,
+  colHeaders: true,
+  licenseKey: 'non-commercial-and-evaluation'
+});
+```
+
+If, on the other hand, you use Handsontable in a project that supports your commercial activity, then you must purchase the license key at [handsontable.com](//handsontable.com/pricing).
+
+The license key is validated in an offline mode.  No connection is made to any server. [Learn more](//handsontable.com/docs/tutorial-license-key.html) about how it works.
+
+<br>
+<br>
+
+Created by [Handsoncode](//handsoncode.net) with ❤ and ☕ in [Tricity](//en.wikipedia.org/wiki/Tricity,_Poland).

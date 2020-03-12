@@ -1,121 +1,283 @@
-(function (Handsontable) {
+import {
+  addClass,
+  empty,
+  fastInnerHTML,
+  getComputedStyle,
+  getCssTransform,
+  hasClass,
+  offset,
+  outerHeight,
+  outerWidth,
+  removeClass,
+  resetCssTransform,
+} from './../helpers/dom/element';
+import { stopImmediatePropagation } from './../helpers/dom/event';
+import { KEY_CODES } from './../helpers/unicode';
+import BaseEditor, { EditorState } from './_baseEditor';
+import { objectEach } from '../helpers/object';
 
-  var SelectEditor = Handsontable.editors.BaseEditor.prototype.extend();
+const EDITOR_VISIBLE_CLASS_NAME = 'ht_editor_visible';
 
-  SelectEditor.prototype.init = function(){
-    this.select = document.createElement('SELECT');
-    Handsontable.Dom.addClass(this.select, 'htSelectEditor');
+/**
+ * @private
+ * @editor SelectEditor
+ * @class SelectEditor
+ */
+class SelectEditor extends BaseEditor {
+  /**
+   * Initializes editor instance, DOM Element and mount hooks.
+   */
+  init() {
+    this.select = this.hot.rootDocument.createElement('SELECT');
+    addClass(this.select, 'htSelectEditor');
     this.select.style.display = 'none';
-    this.instance.rootElement[0].appendChild(this.select);
-  };
 
-  SelectEditor.prototype.prepare = function(){
-    Handsontable.editors.BaseEditor.prototype.prepare.apply(this, arguments);
+    this.hot.rootElement.appendChild(this.select);
+    this.registerHooks();
+  }
 
+  /**
+   * Returns select's value.
+   *
+   * @returns {*}
+   */
+  getValue() {
+    return this.select.value;
+  }
 
-    var selectOptions = this.cellProperties.selectOptions;
-    var options;
+  /**
+   * Sets value in the select element.
+   *
+   * @param {*} value A new select's value.
+   */
+  setValue(value) {
+    this.select.value = value;
+  }
 
-    if (typeof selectOptions == 'function'){
-      options =  this.prepareOptions(selectOptions(this.row, this.col, this.prop))
+  /**
+   * Opens the editor and adjust its size.
+   */
+  open() {
+    this._opened = true;
+    this.refreshDimensions();
+    this.select.style.display = '';
+    this.addHook('beforeKeyDown', () => this.onBeforeKeyDown());
+  }
+
+  /**
+   * Closes the editor.
+   */
+  close() {
+    this._opened = false;
+    this.select.style.display = 'none';
+
+    if (hasClass(this.select, EDITOR_VISIBLE_CLASS_NAME)) {
+      removeClass(this.select, EDITOR_VISIBLE_CLASS_NAME);
+    }
+    this.clearHooks();
+  }
+
+  /**
+   * Sets focus state on the select element.
+   */
+  focus() {
+    this.select.focus();
+  }
+
+  /**
+   * Binds hooks to refresh editor's size after scrolling of the viewport or resizing of columns/rows.
+   *
+   * @private
+   */
+  registerHooks() {
+    this.addHook('afterScrollHorizontally', () => this.refreshDimensions());
+    this.addHook('afterScrollVertically', () => this.refreshDimensions());
+    this.addHook('afterColumnResize', () => this.refreshDimensions());
+    this.addHook('afterRowResize', () => this.refreshDimensions());
+  }
+
+  /**
+   * Prepares editor's meta data and a list of available options.
+   *
+   * @param {Number} row
+   * @param {Number} col
+   * @param {Number|String} prop
+   * @param {HTMLTableCellElement} td
+   * @param {*} originalValue
+   * @param {Object} cellProperties
+   */
+  prepare(row, col, prop, td, originalValue, cellProperties) {
+    super.prepare(row, col, prop, td, originalValue, cellProperties);
+
+    const selectOptions = this.cellProperties.selectOptions;
+    let options;
+
+    if (typeof selectOptions === 'function') {
+      options = this.prepareOptions(selectOptions(this.row, this.col, this.prop));
     } else {
-      options =  this.prepareOptions(selectOptions);
+      options = this.prepareOptions(selectOptions);
     }
 
-    Handsontable.Dom.empty(this.select);
+    empty(this.select);
 
-    for (var option in options){
-      if (options.hasOwnProperty(option)){
-        var optionElement = document.createElement('OPTION');
-        optionElement.value = option;
-        Handsontable.Dom.fastInnerHTML(optionElement, options[option]);
-        this.select.appendChild(optionElement);
-      }
-    }
-  };
+    objectEach(options, (value, key) => {
+      const optionElement = this.hot.rootDocument.createElement('OPTION');
+      optionElement.value = key;
 
-  SelectEditor.prototype.prepareOptions = function(optionsToPrepare){
+      fastInnerHTML(optionElement, value);
+      this.select.appendChild(optionElement);
+    });
+  }
 
-    var preparedOptions = {};
+  /**
+   * Creates consistent list of available options.
+   *
+   * @private
+   * @param {Array|Object} optionsToPrepare
+   * @returns {Object}
+   */
+  prepareOptions(optionsToPrepare) {
+    let preparedOptions = {};
 
-    if (Handsontable.helper.isArray(optionsToPrepare)){
-      for(var i = 0, len = optionsToPrepare.length; i < len; i++){
+    if (Array.isArray(optionsToPrepare)) {
+      for (let i = 0, len = optionsToPrepare.length; i < len; i++) {
         preparedOptions[optionsToPrepare[i]] = optionsToPrepare[i];
       }
-    }
-    else if (typeof optionsToPrepare == 'object') {
+
+    } else if (typeof optionsToPrepare === 'object') {
       preparedOptions = optionsToPrepare;
     }
 
     return preparedOptions;
+  }
 
-  };
+  /**
+   * Refreshes editor's value using source data.
+   *
+   * @private
+   */
+  refreshValue() {
+    const sourceData = this.hot.getSourceDataAtCell(this.row, this.prop);
+    this.originalValue = sourceData;
 
-  SelectEditor.prototype.getValue = function () {
-    return this.select.value;
-  };
+    this.setValue(sourceData);
+    this.refreshDimensions();
+  }
 
-  SelectEditor.prototype.setValue = function (value) {
-    this.select.value = value;
-  };
+  /**
+   * Refreshes editor's size and position.
+   *
+   * @private
+   */
+  refreshDimensions() {
+    if (this.state !== EditorState.EDITING) {
+      return;
+    }
 
-  var onBeforeKeyDown = function (event) {
-    var instance = this;
-    var editor = instance.getActiveEditor();
+    this.TD = this.getEditedCell();
 
-    switch (event.keyCode){
-      case Handsontable.helper.keyCode.ARROW_UP:
+    // TD is outside of the viewport.
+    if (!this.TD) {
+      this.close();
 
-        var previousOption = editor.select.find('option:selected').prev();
+      return;
+    }
+    const { wtOverlays } = this.hot.view.wt;
+    const currentOffset = offset(this.TD);
+    const containerOffset = offset(this.hot.rootElement);
+    const scrollableContainer = wtOverlays.scrollableElement;
+    const editorSection = this.checkEditorSection();
+    let width = outerWidth(this.TD) + 1;
+    let height = outerHeight(this.TD) + 1;
+    let editTop = currentOffset.top - containerOffset.top - 1 - (scrollableContainer.scrollTop || 0);
+    let editLeft = currentOffset.left - containerOffset.left - 1 - (scrollableContainer.scrollLeft || 0);
+    let cssTransformOffset;
 
-        if (previousOption.length == 1){
-          previousOption.prop('selected', true);
-        }
-
-        event.stopImmediatePropagation();
-        event.preventDefault();
+    switch (editorSection) {
+      case 'top':
+        cssTransformOffset = getCssTransform(wtOverlays.topOverlay.clone.wtTable.holder.parentNode);
         break;
-
-      case Handsontable.helper.keyCode.ARROW_DOWN:
-
-        var nextOption = editor.select.find('option:selected').next();
-
-        if (nextOption.length == 1){
-          nextOption.prop('selected', true);
-        }
-
-        event.stopImmediatePropagation();
-        event.preventDefault();
+      case 'left':
+        cssTransformOffset = getCssTransform(wtOverlays.leftOverlay.clone.wtTable.holder.parentNode);
+        break;
+      case 'top-left-corner':
+        cssTransformOffset = getCssTransform(wtOverlays.topLeftCornerOverlay.clone.wtTable.holder.parentNode);
+        break;
+      case 'bottom-left-corner':
+        cssTransformOffset = getCssTransform(wtOverlays.bottomLeftCornerOverlay.clone.wtTable.holder.parentNode);
+        break;
+      case 'bottom':
+        cssTransformOffset = getCssTransform(wtOverlays.bottomOverlay.clone.wtTable.holder.parentNode);
+        break;
+      default:
         break;
     }
-  };
 
-  SelectEditor.prototype.open = function () {
-    var width = Handsontable.Dom.outerWidth(this.TD); //important - group layout reads together for better performance
-    var height = Handsontable.Dom.outerHeight(this.TD);
-    var rootOffset = Handsontable.Dom.offset(this.instance.rootElement[0]);
-    var tdOffset = Handsontable.Dom.offset(this.TD);
+    if (this.hot.getSelectedLast()[0] === 0) {
+      editTop += 1;
+    }
+    if (this.hot.getSelectedLast()[1] === 0) {
+      editLeft += 1;
+    }
 
-    this.select.style.height = height + 'px';
-    this.select.style.minWidth = width + 'px';
-    this.select.style.top = tdOffset.top - rootOffset.top + 'px';
-    this.select.style.left = tdOffset.left - rootOffset.left + 'px';
-    this.select.style.margin = '0px';
-    this.select.style.display = '';
+    const selectStyle = this.select.style;
 
-    this.instance.addHook('beforeKeyDown', onBeforeKeyDown);
-  };
+    if (cssTransformOffset && cssTransformOffset !== -1) {
+      selectStyle[cssTransformOffset[0]] = cssTransformOffset[1];
+    } else {
+      resetCssTransform(this.select);
+    }
 
-  SelectEditor.prototype.close = function () {
-    this.select.style.display = 'none';
-    this.instance.removeHook('beforeKeyDown', onBeforeKeyDown);
-  };
+    const cellComputedStyle = getComputedStyle(this.TD, this.hot.rootWindow);
 
-  SelectEditor.prototype.focus = function () {
-    this.select.focus();
-  };
+    if (parseInt(cellComputedStyle.borderTopWidth, 10) > 0) {
+      height -= 1;
+    }
+    if (parseInt(cellComputedStyle.borderLeftWidth, 10) > 0) {
+      width -= 1;
+    }
 
-  Handsontable.editors.SelectEditor = SelectEditor;
-  Handsontable.editors.registerEditor('select', SelectEditor);
+    selectStyle.height = `${height}px`;
+    selectStyle.minWidth = `${width}px`;
+    selectStyle.top = `${editTop}px`;
+    selectStyle.left = `${editLeft}px`;
+    selectStyle.margin = '0px';
 
-})(Handsontable);
+    addClass(this.select, EDITOR_VISIBLE_CLASS_NAME);
+  }
+
+  /**
+   * onBeforeKeyDown callback.
+   *
+   * @private
+   */
+  onBeforeKeyDown() {
+    const previousOptionIndex = this.select.selectedIndex - 1;
+    const nextOptionIndex = this.select.selectedIndex + 1;
+
+    switch (event.keyCode) {
+      case KEY_CODES.ARROW_UP:
+        if (previousOptionIndex >= 0) {
+          this.select[previousOptionIndex].selected = true;
+        }
+
+        stopImmediatePropagation(event);
+        event.preventDefault();
+        break;
+
+      case KEY_CODES.ARROW_DOWN:
+        if (nextOptionIndex <= this.select.length - 1) {
+          this.select[nextOptionIndex].selected = true;
+        }
+
+        stopImmediatePropagation(event);
+        event.preventDefault();
+        break;
+
+      default:
+        break;
+    }
+  }
+}
+
+export default SelectEditor;
